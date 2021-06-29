@@ -81,7 +81,7 @@ def follower_action(a_o, load):
     return a_f.value
 
 def almost_same(a,b):
-    if np.abs(a-b)<=1e-9:
+    if np.abs(a-b)<=1e-5:
         return True
     else:
         return False
@@ -200,7 +200,7 @@ def step_size(a_o, a_f, load, d, r):
         else:
             s *=0.8
 
-a_o = np.array([5,5,3,3]) #
+a_o = np.array([10,10,8,8]) #
 load = [2, 4]
 a_f = np.array(follower_action(a_o, load))
 
