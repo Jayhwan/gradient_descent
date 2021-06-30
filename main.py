@@ -179,8 +179,9 @@ def direction_finding(a_o, a_f, load):
     return result, d.value, r.value, v.value, g.value
 
 def step_size(a_o, a_f, load, d, r):
-    s = 100
-    updating_coeff = 0.5
+
+    updating_coeff = 0.1
+    s = updating_coeff
     for i in range(10000):
         next_operator_action = a_o + s*r
         next_follower_action = follower_action(next_operator_action, load)
@@ -198,9 +199,9 @@ def step_size(a_o, a_f, load, d, r):
         if update:
             return s
         else:
-            s *=0.8
+            s *= updating_coeff
 
-a_o = np.array([10,10,8,8]) #
+a_o = np.array([3,3,1,1]) #
 load = [2, 4]
 a_f = np.array(follower_action(a_o, load))
 
