@@ -51,6 +51,7 @@ def user_objective(a_o, a_f, load):
     return a_o[0]*x_s[0]-a_o[1]*x_b[0]+a_o[2]*x_s[1]-a_o[3]*x_b[1]-p_l*(np.sum(np.power(l,2)))-p_soh*(np.sum(np.power(x_s,2)+np.power(x_b,2)))
 
 def follower_action(a_o, load):
+    start = time.time()
     a_f = cp.Variable(4)
     x_s_0 = ((p_soh+p_l)*a_o[0]-p_l*a_o[1]-p_l*a_f[0]-(p_soh+p_l)*a_f[1]-p_soh*p_l*load[0])/(p_soh*(p_soh+2*p_l))
     x_s_1 = ((p_soh+p_l)*a_o[2]-p_l*a_o[3]-p_l*a_f[2]-(p_soh+p_l)*a_f[3]-p_soh*p_l*load[1])/(p_soh*(p_soh+2*p_l))
@@ -68,11 +69,14 @@ def follower_action(a_o, load):
     constraints += [x_s_1 - c_max <= 0]
     constraints += [x_b_0 - c_min <= 0]
     constraints += [x_b_1 - c_min <= 0]
-    constraints += [-l_0<=0, -l_1<=0, -x_s_0<=0, -x_s_1<=0, -x_b_0<=0, -x_s_1<=0]
+    constraints += [-l_0<=0, -l_1<=0, -x_s_0<=0, -x_s_1<=0, -x_b_0<=0, -x_b_1<=0]
 
     prob = cp.Problem(cp.Maximize(objective), constraints)
     result = prob.solve(solver = 'ECOS')
 
+    end = time.time()
+
+    print("Take time : ", end - start)
     #print("x_s : ", x_s_0.value, x_s_1.value)
     #print("x_b : ", x_b_0.value, x_b_1.value)
     #print("l   : ", l_0.value, l_1.value)
@@ -80,8 +84,42 @@ def follower_action(a_o, load):
 
     return a_f.value
 
+def follower_action_no_assign(a_o, load):
+    start = time.time()
+    #a_f = cp.Variable(4)
+    x_s_0 = cp.Variable(1)
+    x_s_1 = cp.Variable(1)
+    x_b_0 = cp.Variable(1)
+    x_b_1 = cp.Variable(1)
+    l_0 = x_s_0 - x_b_0 + load[0]
+    l_1 = x_s_1 - x_b_1 + load[1]
+    objective = a_o[0] * x_s_0 - a_o[1] * x_b_0 + a_o[2] * x_s_1 - a_o[3] * x_b_1 - p_l * (
+                cp.power(l_0, 2) + cp.power(l_1, 2)) - p_soh * (
+                            cp.power(x_s_0, 2) + cp.power(x_b_0, 2) + cp.power(x_s_1, 2) + cp.power(x_b_1, 2))
+    constraints = []
+    constraints += [-beta_s * x_s_0 + beta_b * x_b_0 <= 0]
+    constraints += [beta_s * x_s_0 - beta_b * x_b_0 - q_max <= 0]
+    constraints += [alpha * (-beta_s * x_s_0 + beta_b * x_b_0) - beta_s * x_s_1 + beta_b * x_b_1 <= 0]
+    constraints += [-alpha * (-beta_s * x_s_0 + beta_b * x_b_0) + beta_s * x_s_1 - beta_b * x_b_1 - q_max <= 0]
+    constraints += [x_s_0 - c_max <= 0]
+    constraints += [x_s_1 - c_max <= 0]
+    constraints += [x_b_0 - c_min <= 0]
+    constraints += [x_b_1 - c_min <= 0]
+    constraints += [-l_0 <= 0, -l_1 <= 0, -x_s_0 <= 0, -x_s_1 <= 0, -x_b_0 <= 0, -x_b_1 <= 0]
+    prob = cp.Problem(cp.Maximize(objective), constraints)
+    result = prob.solve(solver = 'ECOS')
+
+    end = time.time()
+
+    print("Take time : ", end - start)
+    #print("x_s : ", x_s_0.value, x_s_1.value)
+    #print("x_b : ", x_b_0.value, x_b_1.value)
+    #print("l   : ", l_0.value, l_1.value)
+    #print("C   : ", a_f.value)
+
+    return x_s_1.value
 def almost_same(a,b):
-    if np.abs(a-b)<=1e-5:
+    if np.abs(a-b)<=5e-4:
         return True
     else:
         return False
@@ -158,7 +196,7 @@ def direction_finding(a_o, a_f, load):
     constraints += [B@v-C@r+constraints_gradient_coefficient.T@g==0]
 
     fcfv = follower_constraints_func_values(a_o, a_f, load)
-
+    print(fcfv)
     for i in range(14):
         if almost_same(fcfv[i], 0):
             constraints += [g[i]>=0]
@@ -172,6 +210,7 @@ def direction_finding(a_o, a_f, load):
 
     prob = cp.Problem(cp.Minimize(objective), constraints)
     result = prob.solve(solver='ECOS')
+
     #print("d : ", d.value)
     #print("r : ", np.array(r.value).T)
     #print("v : ", np.array(v.value).T)
@@ -180,7 +219,7 @@ def direction_finding(a_o, a_f, load):
 
 def step_size(a_o, a_f, load, d, r):
 
-    updating_coeff = 0.1
+    updating_coeff = 0.9
     s = updating_coeff
     for i in range(10000):
         next_operator_action = a_o + s*r
@@ -201,27 +240,33 @@ def step_size(a_o, a_f, load, d, r):
         else:
             s *= updating_coeff
 
-a_o = np.array([3,3,1,1]) #
+
+a_o = np.array([1,2,3,4]) #
 load = [2, 4]
 a_f = np.array(follower_action(a_o, load))
 
-print("operator action    : ", a_o)
-print("user grid buy      : ", l_value(a_o, a_f, load))
-print("required load      : ", load)
-print("operator objective : ", operator_objective(a_o, a_f, load))
-print("user objective     : ", user_objective(a_o, a_f, load))
-
-for i in range(1000):
-    d, _, r, v, g = direction_finding(a_o, a_f, load)
-    r = np.reshape(r, 4)
-    b = step_size(a_o, a_f, load, d, r)
-    a_o = np.array(a_o+b*r)
-    a_f = np.array(follower_action(a_o, load))
-    print("######### iter ", i, "##########")
-    print("d                  : ", d)
-    print("direction          : ", r)
-    print("step size          : ", b)
+for i in range(10):
+    print()
+    follower_action(a_o, load)
+    follower_action_no_assign(a_o, load)
+def f(a_o, a_f, load):
     print("operator action    : ", a_o)
     print("user grid buy      : ", l_value(a_o, a_f, load))
+    print("required load      : ", load)
     print("operator objective : ", operator_objective(a_o, a_f, load))
     print("user objective     : ", user_objective(a_o, a_f, load))
+
+    for i in range(1000):
+        d, _, r, v, g = direction_finding(a_o, a_f, load)
+        r = np.reshape(r, 4)
+        b = step_size(a_o, a_f, load, d, r)
+        a_o = np.array(a_o+b*r)
+        a_f = np.array(follower_action(a_o, load))
+        print("######### iter ", i, "##########")
+        print("d                  : ", d)
+        print("direction          : ", r)
+        print("step size          : ", b)
+        print("operator action    : ", a_o)
+        print("user grid buy      : ", l_value(a_o, a_f, load))
+        print("operator objective : ", operator_objective(a_o, a_f, load))
+        print("user objective     : ", user_objective(a_o, a_f, load))
