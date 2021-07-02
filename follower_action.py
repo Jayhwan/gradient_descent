@@ -21,6 +21,11 @@ q_min = 0.
 c_max = 40.
 c_min = 40.
 
+def follower_action_ni(a_o, load, indiv=False):
+
+
+
+
 
 def follower_action_kkt(a_o, load, indiv=False):
 
