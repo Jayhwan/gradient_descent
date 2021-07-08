@@ -76,7 +76,7 @@ def follower_action(a_o, load):
 
     end = time.time()
 
-    print("Take time : ", end - start)
+    #print("Take time : ", end - start)
     #print("x_s : ", x_s_0.value, x_s_1.value)
     #print("x_b : ", x_b_0.value, x_b_1.value)
     #print("l   : ", l_0.value, l_1.value)
@@ -111,6 +111,7 @@ def follower_action_no_assign(a_o, load):
 
     end = time.time()
 
+    #
     print("Take time : ", end - start)
     #print("x_s : ", x_s_0.value, x_s_1.value)
     #print("x_b : ", x_b_0.value, x_b_1.value)
@@ -270,3 +271,5 @@ def f(a_o, a_f, load):
         print("user grid buy      : ", l_value(a_o, a_f, load))
         print("operator objective : ", operator_objective(a_o, a_f, load))
         print("user objective     : ", user_objective(a_o, a_f, load))
+
+f(a_o, a_f, load)
