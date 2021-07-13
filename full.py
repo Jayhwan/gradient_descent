@@ -2,24 +2,24 @@ import numpy as np
 import cvxpy as cp
 import time
 
-total_user = 100
-active_user = 100
+total_user = 4
+active_user = 4
 time_step = 24
 max_iter = 10000
 alpha = 0.9956
 beta_s = 0.99
 beta_b = 1.01
 
-p_soh = 100
+p_soh = 1
 p_l = 1
 
-p_tax = 0.000001#0.0000001
+p_tax = 0.0000001#0.0000001
 
-q_max = 30.
+q_max = 10000.
 q_min = 0.
 
-c_max = 10.
-c_min = 10.
+c_max = 10000.
+c_min = 10000.
 
 
 def decompose(act_user, t, load_matrix, operator_action, user_action):
@@ -149,8 +149,8 @@ def follower_constraint_value(act_user, t, load_matrix, operator_action=None, us
 
 
 def initial_point(act_user, t):
-    operator_action = 2 * np.ones((2, act_user, t))
-    #operator_action[1] *= 2
+    operator_action = np.ones((2, act_user, t))
+    operator_action[1] *= 2
     return operator_action
 
 
@@ -310,7 +310,7 @@ def direction_finding(act_user, t, load_matrix, operator_action, user_action) :
 
 def step_size(act_user, t, load_matrix, operator_action, user_action, d, r):
     update_coef = 0.5
-    s = 100
+    s = 10000
     for i in range(10000):
         #print(i)
         next_operator_action = operator_action + s * r
@@ -346,6 +346,7 @@ def iterations(act_user, t, load):
         print(i)
         print("dir")
         result, d, r, v, g = direction_finding(act_user, t, load, a_o, a_f)
+        print("r :", r)
         print("d :", result)
         print("step")
         b, _, _ = step_size(act_user, t, load, a_o, a_f, d, r)
@@ -363,8 +364,9 @@ def iterations(act_user, t, load):
     return init, a_o, a_f
 
 load = np.random.random((total_user, time_step))
-load[0] *= 5
-load[2] *= 3
+load[:(active_user-1)//2, 8:13] *= 2
+load[(active_user-1)//2:,18:20] *= 2
+
 #np.save("load.npy", load)
 #load = np.load("load.npy", allow_pickle=True)
 
