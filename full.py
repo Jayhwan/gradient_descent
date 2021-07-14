@@ -1,26 +1,4 @@
-import numpy as np
-import cvxpy as cp
-import time
-
-total_user = 4
-active_user = 4
-time_step = 24
-max_iter = 10000
-alpha = 0.9956
-beta_s = 0.99
-beta_b = 1.01
-
-p_soh = 1
-p_l = 1
-
-p_tax = 0.0000001#0.0000001
-
-q_max = 10000.
-q_min = 0.
-
-c_max = 10000.
-c_min = 10000.
-
+from parameters import *
 
 def decompose(act_user, t, load_matrix, operator_action, user_action):
 
@@ -46,11 +24,14 @@ def decompose(act_user, t, load_matrix, operator_action, user_action):
 
     return [x_s, x_b, l, p_s, p_b, load_active, load_passive]
 
+
 def par(act_user, t, load_matrix, operator_action=None, user_action=None):
 
     [x_s, x_b, l, p_s, p_b, load_active, load_passive] = decompose(act_user, t, load_matrix, operator_action, user_action)
     load_total = np.sum(l, axis=0) + np.sum(load_passive, axis=0)
+
     return np.max(load_total)/np.average(load_total)
+
 
 def operator_objective(act_user, t, load_matrix, operator_action=None, user_action=None):
 
@@ -148,23 +129,14 @@ def follower_constraint_value(act_user, t, load_matrix, operator_action=None, us
     return x
 
 
-def initial_point(act_user, t):
-    operator_action = np.ones((2, act_user, t))
-    operator_action[1] *= 2
-    return operator_action
-
-
-def follower_action(act_user, t, a_o, load, indiv=False):
+def follower_action(act_user, t, a_o, load_matrix):
 
     if total_user == act_user:
-        load_active = load
+        load_active = load_matrix
         load_passive = np.zeros((1, t))
     else:
-        load_active = load[:active_user, :]
-        load_passive = load[active_user:, :]
-
-    if indiv:
-        return 0
+        load_active = load_matrix[:act_user, :]
+        load_passive = load_matrix[act_user:, :]
 
     c1 = cp.Variable((1, t))
     c2 = cp.Variable((1, t))
@@ -310,17 +282,17 @@ def direction_finding(act_user, t, load_matrix, operator_action, user_action) :
 
 def step_size(act_user, t, load_matrix, operator_action, user_action, d, r):
     update_coef = 0.5
-    s = 10000
+    s = update_coef
     for i in range(10000):
         #print(i)
         next_operator_action = operator_action + s * r
-        result, x_s, x_b, l, taken_time = follower_action(act_user, t, next_operator_action, load)
+        result, x_s, x_b, l, taken_time = follower_action(act_user, t, next_operator_action, load_matrix)
         next_follower_action = np.array([x_s, x_b, l])
         update = True
         if operator_objective(act_user, t, load_matrix, next_operator_action, next_follower_action) \
                 >= operator_objective(act_user, t, load_matrix, operator_action, user_action) - update_coef * s * d:
             #print("good")
-            if np.any(operator_constraint_value(active_user, time_step, load_matrix, next_operator_action, next_follower_action) > 0):
+            if np.any(operator_constraint_value(act_user, t, load_matrix, next_operator_action, next_follower_action) > 0):
                 update = False
         else:
             update = False
@@ -331,52 +303,36 @@ def step_size(act_user, t, load_matrix, operator_action, user_action, d, r):
     return 0, operator_action, user_action
 
 
-def iterations(act_user, t, load):
-    init = initial_point(act_user, t)
-    a_o = init
-    result, x_s, x_b, l, taken_time = follower_action(act_user, t, a_o, load)
+def iterations(act_user, t, load_matrix, operator_action):
+
+    a_o = operator_action
+    result, x_s, x_b, l, taken_time = follower_action(act_user, t, a_o, load_matrix)
 
     a_f = np.array([x_s, x_b, l])
 
-    print(operator_objective(act_user, t, load, a_o, a_f))
-    print(par(act_user, t, load, a_o, a_f))
+    print(operator_objective(act_user, t, load_matrix, a_o, a_f))
+    print(par(act_user, t, load_matrix, a_o, a_f))
     epsilon = 1e-8
 
     for i in range(max_iter):
         print(i)
         print("dir")
-        result, d, r, v, g = direction_finding(act_user, t, load, a_o, a_f)
-        print("r :", r)
+        result, d, r, v, g = direction_finding(act_user, t, load_matrix, a_o, a_f)
+        #print("r :", r)
         print("d :", result)
         print("step")
-        b, _, _ = step_size(act_user, t, load, a_o, a_f, d, r)
+        b, _, _ = step_size(act_user, t, load_matrix, a_o, a_f, d, r)
         a_o = a_o + b * r
         print("step size : ", b)
         print("follower")
-        result, x_s, x_b, l, taken_time = follower_action(act_user, t, a_o, load)
+        result, x_s, x_b, l, taken_time = follower_action(act_user, t, a_o, load_matrix)
         a_f = np.array([x_s, x_b, l])
-        print("operator objective :", operator_objective(act_user, t, load, a_o, a_f))
-        print("par                :", par(act_user, t, load, a_o, a_f))
+        print("operator objective :", operator_objective(act_user, t, load_matrix, a_o, a_f))
+        print("par                :", par(act_user, t, load_matrix, a_o, a_f))
         #print("user buy           :", l)
         if b < epsilon:
             break
 
-    return init, a_o, a_f
-
-load = np.random.random((total_user, time_step))
-load[:(active_user-1)//2, 8:13] *= 2
-load[(active_user-1)//2:,18:20] *= 2
-
-#np.save("load.npy", load)
-#load = np.load("load.npy", allow_pickle=True)
-
-print(load)
-#a_o = initial_point(active_user, time_step)
-#result, x_s, x_b, l, taken_time = follower_action(a_o, load)
-#a_f = np.array([x_s, x_b, l])
-#d, _, r, v, g = direction_finding(active_user, time_step, load, a_o, a_f)
-#b = step_size(active_user, time_step, load, a_o, a_f, d, r)
-
-init, a_o, a_f = iterations(active_user, time_step, load)
+    return operator_action, a_o, a_f
 
 
